@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
     --paper:#ece1c8;
@@ -305,6 +306,8 @@
     border-radius:2px;
   }
 
+  .entry.capturing .entry-foot{ display:none; }
+
   .entry-head{
     display:flex;
     justify-content:space-between;
@@ -547,7 +550,7 @@
      2. Tambahkan origin Live Server kamu (mis. http://127.0.0.1:5500) di "Authorized JavaScript origins"
      3. Ganti nilai di bawah ini dengan Client ID milikmu
      Harus dibuka lewat http://... (Live Server), TIDAK bisa lewat file:// */
-  const CLIENT_ID = '1062820946080-oici6of61ja573asqmogtmtmfr7k61os.apps.googleusercontent.com';
+  const CLIENT_ID = 'ISI_CLIENT_ID_KAMU_DI_SINI.apps.googleusercontent.com';
   const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
   let accessToken = null;
   let tokenClient = null;
@@ -684,28 +687,52 @@
       driveStatus.textContent = 'Belum terhubung — klik "Hubungkan Google Drive" dulu';
       return;
     }
-    if(typeof window.jspdf === 'undefined'){
+    if(typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined'){
       driveStatus.textContent = 'Library PDF gagal dimuat';
       return;
     }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text(`Tanggal: ${formatDateStamp(entry.date)}`, 10, 15);
-    doc.text(`Kegiatan: ${entry.activity}`, 10, 25);
-    doc.setFontSize(11);
-    doc.text(doc.splitTextToSize(entry.caption || '', 180), 10, 35);
-
-    let y = 60;
-    for(const src of entry.photos){
-      try{
-        doc.addImage(src, dataUrlFormat(src), 10, y, 80, 60);
-        y += 70;
-        if(y > 250){ doc.addPage(); y = 20; }
-      }catch(err){ console.warn('Gagal menambahkan foto ke PDF', err); }
+    const node = document.querySelector(`[data-id="${entry.id}"]`);
+    if(!node){
+      driveStatus.textContent = 'Gagal menemukan tampilan entri untuk disimpan';
+      return;
     }
 
-    const pdfBlob = doc.output('blob');
+    driveStatus.textContent = 'Menyiapkan PDF...';
+    node.classList.add('capturing');
+    let canvas;
+    try{
+      canvas = await html2canvas(node, { backgroundColor:'#f5eeda', scale:2, useCORS:true });
+    }catch(err){
+      node.classList.remove('capturing');
+      driveStatus.textContent = 'Gagal mengambil tampilan entri';
+      console.error(err);
+      return;
+    }
+    node.classList.remove('capturing');
+
+    const { jsPDF } = window.jspdf;
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const pdf = new jsPDF({ unit:'mm', format:'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 12;
+    const usableWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
+    const imgHeight = (canvas.height * usableWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = margin;
+    pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, imgHeight);
+    heightLeft -= usableHeight;
+
+    while(heightLeft > 0){
+      pdf.addPage();
+      position = margin - (imgHeight - heightLeft);
+      pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, imgHeight);
+      heightLeft -= usableHeight;
+    }
+
+    const pdfBlob = pdf.output('blob');
     const metadata = {
       name: `Jurnal-${formatDateStamp(entry.date)}-${(entry.activity || 'tanpa-judul').slice(0,25)}.pdf`,
       mimeType: 'application/pdf'
@@ -740,7 +767,6 @@
     };
     entries.push(entry);
     entries.sort((a,b)=> b.date.localeCompare(a.date) || b.id - a.id);
-    uploadEntryPdf(entry);
 
     // reset form
     fActivity.value = '';
@@ -751,6 +777,7 @@
     fDate.valueAsDate = new Date();
 
     renderEntries();
+    uploadEntryPdf(entry);
     fActivity.focus();
   });
 
@@ -778,7 +805,7 @@
             ${en.photos.map((src,pi)=>`<button type="button" data-entry="${en.id}" data-photo="${pi}"><img src="${src}" alt="Foto kegiatan ${escapeHtml(en.activity)}"></button>`).join('')}
           </div>` : '';
         return `
-        <article class="entry">
+        <article class="entry" data-id="${en.id}">
           <div class="entry-head">
             <div>
               <div class="entry-num">Entri #${num}</div>
