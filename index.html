@@ -1,11 +1,852 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jurnal Magang</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --paper:#ece1c8;
+    --paper-dark:#ddcda3;
+    --card:#f5eeda;
+    --ink:#2b2a26;
+    --ink-soft:#57534a;
+    --teal:#2f5d55;
+    --teal-dark:#22443d;
+    --stamp:#a6362c;
+    --binder:#b9ac88;
+    --binder-hole:#c9bda0;
+    --line:#c9bc98;
+    --radius:10px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--teal);color:var(--paper);}
+
+  /* binder / hole-punch left margin, like a physical logbook */
+  .binder{
+    position:fixed;
+    top:0; left:0; bottom:0;
+    width:34px;
+    background:linear-gradient(90deg, var(--binder) 0%, var(--binder) 60%, transparent 100%);
+    z-index:5;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding-top:40px;
+    gap:34px;
+  }
+  .binder span{
+    width:14px; height:14px;
+    border-radius:50%;
+    background:var(--paper);
+    box-shadow:inset 0 2px 3px rgba(0,0,0,.35);
+  }
+  @media (max-width:640px){ .binder{display:none;} }
+
+  .page{
+    max-width:900px;
+    margin:0 auto;
+    padding:56px 28px 100px;
+  }
+  @media (min-width:641px){ .page{ margin-left:34px; } }
+
+  /* ---------- header ---------- */
+  header.cover{
+    border-bottom:3px double var(--ink);
+    padding-bottom:22px;
+    margin-bottom:34px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--teal-dark);
+    margin:0 0 6px;
+  }
+  h1.title{
+    font-family:'Special Elite',cursive;
+    font-weight:400;
+    font-size:clamp(32px,6vw,48px);
+    margin:0 0 14px;
+    letter-spacing:.01em;
+  }
+  .meta-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px 28px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .meta-row .field{ display:flex; gap:6px; align-items:baseline; }
+  .meta-row label{ color:var(--teal-dark); }
+  .meta-row [contenteditable]{
+    outline:none;
+    border-bottom:1px dashed var(--line);
+    min-width:60px;
+    padding:0 2px;
+    color:var(--ink);
+  }
+  .meta-row [contenteditable]:focus{
+    border-bottom:1px solid var(--teal);
+    background:rgba(47,93,85,.06);
+  }
+
+  /* ---------- stats ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-bottom:36px;
+  }
+  .stat{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .stat b{
+    display:block;
+    font-family:'Special Elite',cursive;
+    font-size:26px;
+    font-weight:400;
+    color:var(--teal-dark);
+  }
+  .stat span{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  @media (max-width:560px){ .stats{ grid-template-columns:1fr; } }
+
+  /* ---------- form card ---------- */
+  .form-card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:24px;
+    margin-bottom:40px;
+    position:relative;
+  }
+  .form-card h2{
+    font-family:'Special Elite',cursive;
+    font-weight:400;
+    font-size:20px;
+    margin:0 0 18px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .form-card h2::before{
+    content:"";
+    width:8px;height:8px;
+    background:var(--stamp);
+    border-radius:50%;
+    display:inline-block;
+  }
+  .grid-2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:560px){ .grid-2{ grid-template-columns:1fr; } }
+
+  .fld{ margin-bottom:16px; }
+  .fld label{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--teal-dark);
+    margin-bottom:6px;
+  }
+  .fld input[type=text],
+  .fld input[type=date],
+  .fld textarea{
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .fld input:focus,
+  .fld textarea:focus{
+    outline:2px solid var(--teal);
+    outline-offset:1px;
+    background:#fff;
+  }
+  .fld textarea{ resize:vertical; min-height:70px; font-family:inherit; }
+
+  .photo-drop{
+    border:2px dashed var(--line);
+    border-radius:8px;
+    padding:18px;
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .photo-drop:hover, .photo-drop.drag{
+    border-color:var(--teal);
+    background:rgba(47,93,85,.05);
+  }
+  .photo-drop input{ display:none; }
+
+  .preview-strip{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:12px;
+  }
+  .preview-thumb{
+    position:relative;
+    width:64px; height:64px;
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .preview-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .preview-thumb button{
+    position:absolute; top:2px; right:2px;
+    width:18px;height:18px;
+    border:none; border-radius:50%;
+    background:var(--stamp); color:#fff;
+    font-size:11px; line-height:1;
+    cursor:pointer;
+  }
+
+  .btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    letter-spacing:.04em;
+    padding:11px 20px;
+    border-radius:6px;
+    border:1px solid var(--teal-dark);
+    background:var(--teal);
+    color:#fff;
+    cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .btn:hover{ background:var(--teal-dark); }
+  .btn:active{ transform:scale(.98); }
+  .btn:focus-visible{ outline:2px solid var(--stamp); outline-offset:2px; }
+  .btn.ghost{
+    background:transparent;
+    color:var(--teal-dark);
+  }
+  .btn.ghost:hover{ background:rgba(47,93,85,.08); }
+  .form-actions{ display:flex; gap:12px; margin-top:6px; align-items:center; }
+  .form-hint{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-soft); }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+    border-top:1px dashed var(--line);
+    border-bottom:1px dashed var(--line);
+    padding:12px 0;
+  }
+  .toolbar input[type=search]{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    padding:9px 12px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:var(--card);
+    min-width:220px;
+  }
+  .toolbar input[type=search]:focus{ outline:2px solid var(--teal); }
+
+  /* ---------- entries ---------- */
+  .entries{ display:flex; flex-direction:column; gap:26px; }
+
+  .entry{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 22px 20px;
+    position:relative;
+  }
+  /* washi tape corner */
+  .entry::before{
+    content:"";
+    position:absolute;
+    top:-10px; left:26px;
+    width:70px; height:22px;
+    background:repeating-linear-gradient(45deg, rgba(166,54,44,.35) 0 6px, rgba(166,54,44,.2) 6px 12px);
+    transform:rotate(-4deg);
+    opacity:.85;
+    border-radius:2px;
+  }
+
+  .entry-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+  }
+  .entry-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:.06em;
+  }
+  .entry-title{
+    font-family:'Special Elite',cursive;
+    font-weight:400;
+    font-size:21px;
+    margin:2px 0 0;
+    line-height:1.3;
+  }
+  .stamp{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:600;
+    color:var(--stamp);
+    border:2px solid var(--stamp);
+    border-radius:4px;
+    padding:5px 10px;
+    transform:rotate(-3deg);
+    white-space:nowrap;
+    letter-spacing:.04em;
+    flex-shrink:0;
+  }
+
+  .entry-caption{
+    font-size:14.5px;
+    line-height:1.6;
+    color:var(--ink);
+    margin:0 0 14px;
+    white-space:pre-wrap;
+  }
+
+  .photo-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    grid-auto-rows:170px;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .photo-grid button{
+    padding:4px; border:1px solid var(--line); border-radius:6px;
+    overflow:hidden; cursor:zoom-in; background:#fff;
+    height:100%; width:100%;
+  }
+  .photo-grid img{ width:100%; height:100%; object-fit:contain; display:block; transition:transform .2s; }
+  .photo-grid button:hover img{ transform:scale(1.04); }
+
+  .entry-foot{
+    display:flex;
+    justify-content:flex-end;
+  }
+  .link-btn{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--stamp);
+    background:none;
+    border:none;
+    cursor:pointer;
+    text-decoration:underline;
+    padding:2px;
+  }
+
+  .empty{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+  }
+
+  /* ---------- lightbox ---------- */
+  .lightbox{
+    position:fixed; inset:0;
+    background:rgba(20,18,14,.88);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:50;
+    padding:30px;
+  }
+  .lightbox.open{ display:flex; }
+  .lightbox img{ max-width:100%; max-height:100%; border-radius:6px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  .lightbox-close{
+    position:absolute; top:22px; right:26px;
+    background:none; border:1px solid var(--paper); color:var(--paper);
+    width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:16px;
+  }
+
+  footer.pagenote{
+    margin-top:50px;
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:.05em;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior:auto; }
+    *{ transition:none !important; }
+  }
+
+  /* ---------- print ---------- */
+  @media print{
+    .binder, .form-card, .toolbar, .btn, .link-btn, .lightbox{ display:none !important; }
+    body{ background:#fff; }
+    .page{ margin-left:0; max-width:100%; }
+    .entry{ break-inside:avoid; border:1px solid #999; padding:20px; }
+    .entry::before{ display:none; }
+
+    /* setiap foto tampil besar, tengah halaman, tidak terpotong border */
+    .photo-grid{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      grid-auto-rows:unset;
+      gap:16px;
+      margin:16px 0;
+    }
+    .photo-grid button{
+      cursor:default;
+      width:72%;
+      max-width:420px;
+      height:340px;
+      padding:8px;
+      border:1px solid #999;
+      margin:0 auto;
+      break-inside:avoid;
+    }
+    .photo-grid img{ object-fit:contain; }
+  }
+</style>
 </head>
 <body>
-    
+
+  <div class="binder" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+  </div>
+
+  <div class="page">
+
+    <header class="cover">
+      <p class="eyebrow">Buku Catatan Kegiatan</p>
+      <h1 class="title">Jurnal Magang</h1>
+      <div class="meta-row">
+        <span class="field"><label>Nama:</label><span contenteditable="true" data-placeholder="Nama kamu">Klik untuk isi nama</span></span>
+        <span class="field"><label>Instansi:</label><span contenteditable="true" data-placeholder="Nama instansi">Klik untuk isi instansi</span></span>
+        <span class="field"><label>Periode:</label><span contenteditable="true" data-placeholder="Bulan – Bulan">Klik untuk isi periode</span></span>
+      </div>
+    </header>
+
+    <section class="stats">
+      <div class="stat"><b id="statCount">0</b><span>Total entri</span></div>
+      <div class="stat"><b id="statPhotos">0</b><span>Total foto</span></div>
+      <div class="stat"><b id="statLast">–</b><span>Entri terakhir</span></div>
+    </section>
+
+    <section class="form-card">
+      <h2>Tambah Entri Baru</h2>
+      <form id="entryForm">
+        <div class="grid-2">
+          <div class="fld">
+            <label for="fDate">Tanggal</label>
+            <input type="date" id="fDate" required>
+          </div>
+          <div class="fld">
+            <label for="fActivity">Nama Kegiatan</label>
+            <input type="text" id="fActivity" placeholder="cth. Input data laporan mingguan" required>
+          </div>
+        </div>
+
+        <div class="fld">
+          <label for="fCaption">Caption / Catatan</label>
+          <textarea id="fCaption" placeholder="Ceritakan apa yang kamu kerjakan hari ini..."></textarea>
+        </div>
+
+        <div class="fld">
+          <label>Foto</label>
+          <label class="photo-drop" id="dropZone">
+            📎 Klik atau seret foto ke sini (bisa lebih dari satu)
+            <input type="file" id="fPhotos" accept="image/*" multiple>
+          </label>
+          <div class="preview-strip" id="previewStrip"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn">Simpan Entri</button>
+          <span class="form-hint">Tersimpan selama halaman ini terbuka</span>
+        </div>
+      </form>
+    </section>
+
+    <section class="toolbar">
+      <input type="search" id="searchBox" placeholder="Cari kegiatan atau caption...">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button type="button" class="btn ghost" id="connectDriveBtn">🔗 Hubungkan Google Drive</button>
+        <span class="form-hint" id="driveStatus">Belum terhubung</span>
+        <button class="btn ghost" id="printBtn">🖨️ Cetak / Ekspor PDF</button>
+      </div>
+    </section>
+
+    <section class="entries" id="entriesList"></section>
+
+    <footer class="pagenote">— akhir catatan, teruskan magangnya —</footer>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Tutup">✕</button>
+    <img id="lightboxImg" src="" alt="Pratinjau foto">
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /** in-memory data store — entri hilang saat halaman di-refresh.
+   *  jika ingin data tersimpan permanen di browser kamu sendiri,
+   *  ganti bagian ini dengan localStorage saat menjalankan file
+   *  ini di luar Claude (lihat catatan di akhir chat). */
+  let entries = [];
+  let pendingPhotos = []; // {name, dataUrl} sebelum entri disimpan
+  let nextId = 1;
+
+  /* ==== KONEKSI GOOGLE DRIVE ====
+     1. Buat OAuth Client ID di console.cloud.google.com (aktifkan Google Drive API)
+     2. Tambahkan origin Live Server kamu (mis. http://127.0.0.1:5500) di "Authorized JavaScript origins"
+     3. Ganti nilai di bawah ini dengan Client ID milikmu
+     Harus dibuka lewat http://... (Live Server), TIDAK bisa lewat file:// */
+  const CLIENT_ID = '1062820946080-oici6of61ja573asqmogtmtmfr7k61os.apps.googleusercontent.com';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  let accessToken = null;
+  let tokenClient = null;
+
+  const form = document.getElementById('entryForm');
+  const fDate = document.getElementById('fDate');
+  const fActivity = document.getElementById('fActivity');
+  const fCaption = document.getElementById('fCaption');
+  const fPhotos = document.getElementById('fPhotos');
+  const dropZone = document.getElementById('dropZone');
+  const previewStrip = document.getElementById('previewStrip');
+  const entriesList = document.getElementById('entriesList');
+  const searchBox = document.getElementById('searchBox');
+  const statCount = document.getElementById('statCount');
+  const statPhotos = document.getElementById('statPhotos');
+  const statLast = document.getElementById('statLast');
+  const printBtn = document.getElementById('printBtn');
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  const lightboxClose = document.getElementById('lightboxClose');
+
+  // default tanggal = hari ini
+  fDate.valueAsDate = new Date();
+
+  function formatDateLong(isoStr){
+    if(!isoStr) return '';
+    const d = new Date(isoStr + 'T00:00:00');
+    return d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function formatDateStamp(isoStr){
+    if(!isoStr) return '';
+    const d = new Date(isoStr + 'T00:00:00');
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return `${dd}-${mm}-${d.getFullYear()}`;
+  }
+
+  function readFileAsDataUrl(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=> resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFiles(fileList){
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    for(const file of files){
+      try{
+        const dataUrl = await readFileAsDataUrl(file);
+        pendingPhotos.push({ name:file.name, dataUrl });
+      }catch(e){ console.error('Gagal membaca foto', e); }
+    }
+    renderPreview();
+  }
+
+  function renderPreview(){
+    previewStrip.innerHTML = '';
+    pendingPhotos.forEach((p, idx)=>{
+      const div = document.createElement('div');
+      div.className = 'preview-thumb';
+      div.innerHTML = `<img src="${p.dataUrl}" alt="${escapeHtml(p.name)}">
+        <button type="button" aria-label="Hapus foto ini" data-idx="${idx}">✕</button>`;
+      previewStrip.appendChild(div);
+    });
+  }
+
+  previewStrip.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-idx]');
+    if(!btn) return;
+    const idx = Number(btn.dataset.idx);
+    pendingPhotos.splice(idx,1);
+    renderPreview();
+  });
+
+  fPhotos.addEventListener('change', (e)=> handleFiles(e.target.files));
+
+  dropZone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', (e)=>{
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  });
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  const driveStatus = document.getElementById('driveStatus');
+  const connectDriveBtn = document.getElementById('connectDriveBtn');
+
+  window.addEventListener('load', ()=>{
+    if(typeof google === 'undefined' || !google.accounts){
+      driveStatus.textContent = 'Google script gagal dimuat (cek koneksi internet)';
+      return;
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp)=>{
+        if(resp.error){
+          driveStatus.textContent = 'Gagal terhubung: ' + resp.error;
+          return;
+        }
+        accessToken = resp.access_token;
+        driveStatus.textContent = 'Terhubung ✓';
+      }
+    });
+  });
+
+  connectDriveBtn.addEventListener('click', ()=>{
+    if(CLIENT_ID.includes('ISI_CLIENT_ID')){
+      alert('Isi dulu CLIENT_ID di dalam kode dengan Client ID dari Google Cloud Console.');
+      return;
+    }
+    if(!tokenClient){
+      driveStatus.textContent = 'Google belum siap, coba beberapa detik lagi';
+      return;
+    }
+    tokenClient.requestAccessToken();
+  });
+
+  function dataUrlFormat(dataUrl){
+    return dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+  }
+
+  async function uploadEntryPdf(entry){
+    if(!accessToken){
+      driveStatus.textContent = 'Belum terhubung — klik "Hubungkan Google Drive" dulu';
+      return;
+    }
+    if(typeof window.jspdf === 'undefined'){
+      driveStatus.textContent = 'Library PDF gagal dimuat';
+      return;
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(`Tanggal: ${formatDateStamp(entry.date)}`, 10, 15);
+    doc.text(`Kegiatan: ${entry.activity}`, 10, 25);
+    doc.setFontSize(11);
+    doc.text(doc.splitTextToSize(entry.caption || '', 180), 10, 35);
+
+    let y = 60;
+    for(const src of entry.photos){
+      try{
+        doc.addImage(src, dataUrlFormat(src), 10, y, 80, 60);
+        y += 70;
+        if(y > 250){ doc.addPage(); y = 20; }
+      }catch(err){ console.warn('Gagal menambahkan foto ke PDF', err); }
+    }
+
+    const pdfBlob = doc.output('blob');
+    const metadata = {
+      name: `Jurnal-${formatDateStamp(entry.date)}-${(entry.activity || 'tanpa-judul').slice(0,25)}.pdf`,
+      mimeType: 'application/pdf'
+    };
+    const body = new FormData();
+    body.append('metadata', new Blob([JSON.stringify(metadata)], { type:'application/json' }));
+    body.append('file', pdfBlob);
+
+    driveStatus.textContent = 'Mengunggah ke Drive...';
+    try{
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body
+      });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      driveStatus.textContent = 'Tersimpan ke Drive ✓';
+    }catch(err){
+      driveStatus.textContent = 'Gagal mengunggah ke Drive';
+      console.error(err);
+    }
+  }
+
+  form.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const entry = {
+      id: nextId++,
+      date: fDate.value,
+      activity: fActivity.value.trim(),
+      caption: fCaption.value.trim(),
+      photos: pendingPhotos.map(p=>p.dataUrl)
+    };
+    entries.push(entry);
+    entries.sort((a,b)=> b.date.localeCompare(a.date) || b.id - a.id);
+    uploadEntryPdf(entry);
+
+    // reset form
+    fActivity.value = '';
+    fCaption.value = '';
+    fPhotos.value = '';
+    pendingPhotos = [];
+    renderPreview();
+    fDate.valueAsDate = new Date();
+
+    renderEntries();
+    fActivity.focus();
+  });
+
+  function deleteEntry(id){
+    entries = entries.filter(en => en.id !== id);
+    renderEntries();
+  }
+
+  function renderEntries(){
+    const query = searchBox.value.trim().toLowerCase();
+    const filtered = entries.filter(en=>{
+      if(!query) return true;
+      return en.activity.toLowerCase().includes(query) || en.caption.toLowerCase().includes(query);
+    });
+
+    if(entries.length === 0){
+      entriesList.innerHTML = `<div class="empty">Belum ada entri. Isi formulir di atas untuk mulai mencatat kegiatan magangmu.</div>`;
+    } else if(filtered.length === 0){
+      entriesList.innerHTML = `<div class="empty">Tidak ada entri yang cocok dengan pencarian "${escapeHtml(query)}".</div>`;
+    } else {
+      entriesList.innerHTML = filtered.map((en, i)=>{
+        const num = String(entries.length - entries.indexOf(en)).padStart(2,'0');
+        const photosHtml = en.photos.length ? `
+          <div class="photo-grid">
+            ${en.photos.map((src,pi)=>`<button type="button" data-entry="${en.id}" data-photo="${pi}"><img src="${src}" alt="Foto kegiatan ${escapeHtml(en.activity)}"></button>`).join('')}
+          </div>` : '';
+        return `
+        <article class="entry">
+          <div class="entry-head">
+            <div>
+              <div class="entry-num">Entri #${num}</div>
+              <h3 class="entry-title">${escapeHtml(en.activity) || '(tanpa judul)'}</h3>
+            </div>
+            <div class="stamp">${formatDateStamp(en.date)}</div>
+          </div>
+          ${en.caption ? `<p class="entry-caption">${escapeHtml(en.caption)}</p>` : ''}
+          ${photosHtml}
+          <div class="entry-foot">
+            <button type="button" class="link-btn" data-del="${en.id}">Hapus entri</button>
+          </div>
+        </article>`;
+      }).join('');
+    }
+
+    // stats
+    statCount.textContent = entries.length;
+    statPhotos.textContent = entries.reduce((sum,en)=> sum + en.photos.length, 0);
+    statLast.textContent = entries.length ? formatDateLong(entries[0].date) : '–';
+  }
+
+  entriesList.addEventListener('click', (e)=>{
+    const delBtn = e.target.closest('button[data-del]');
+    if(delBtn){
+      if(confirm('Hapus entri ini?')) deleteEntry(Number(delBtn.dataset.del));
+      return;
+    }
+    const photoBtn = e.target.closest('button[data-photo]');
+    if(photoBtn){
+      const entry = entries.find(en => en.id === Number(photoBtn.dataset.entry));
+      const src = entry.photos[Number(photoBtn.dataset.photo)];
+      openLightbox(src);
+    }
+  });
+
+  function openLightbox(src){
+    lightboxImg.src = src;
+    lightbox.classList.add('open');
+  }
+  function closeLightbox(){
+    lightbox.classList.remove('open');
+    lightboxImg.src = '';
+  }
+  lightboxClose.addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', (e)=>{ if(e.target === lightbox) closeLightbox(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeLightbox(); });
+
+  searchBox.addEventListener('input', renderEntries);
+  printBtn.addEventListener('click', ()=> window.print());
+
+  // contenteditable placeholder behaviour
+  document.querySelectorAll('.meta-row [contenteditable]').forEach(el=>{
+    el.addEventListener('focus', function(){
+      if(this.dataset.filled !== 'true'){ this.textContent=''; }
+    });
+    el.addEventListener('blur', function(){
+      if(this.textContent.trim() === ''){
+        this.textContent = this.dataset.placeholder;
+        this.dataset.filled = 'false';
+      } else {
+        this.dataset.filled = 'true';
+      }
+    });
+  });
+
+  renderEntries();
+})();
+</script>
 </body>
 </html>
